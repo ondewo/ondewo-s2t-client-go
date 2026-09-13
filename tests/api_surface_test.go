@@ -27,7 +27,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	s2t "github.com/ondewo/ondewo-s2t-client-go/api/ondewo/s2t"
+	s2t "github.com/ondewo/ondewo-s2t-client-go/v7/api/ondewo/s2t"
 )
 
 // protoFileCount is the number of .proto files below ondewo-s2t-api/ondewo that the compiler

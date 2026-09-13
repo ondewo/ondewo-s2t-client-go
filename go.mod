@@ -1,4 +1,4 @@
-module github.com/ondewo/ondewo-s2t-client-go
+module github.com/ondewo/ondewo-s2t-client-go/v7
 
 go 1.25.0
 
