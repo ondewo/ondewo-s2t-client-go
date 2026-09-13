@@ -90,7 +90,13 @@ jobs:
           work_dir=$(mktemp -d)
           cd "${work_dir}"
           go mod init ondewo.local/consumer
-          go mod edit -require="${module_path}@v0.0.0" -replace="${module_path}=${GITHUB_WORKSPACE}"
+          # A module whose path carries a major-version suffix rejects a mismatched placeholder:
+          # `go mod edit -require=.../v7@v0.0.0` writes a go.mod that does not even parse
+          # ("version v0.0.0 invalid: should be v7, not v0"). Derive it from the path; `replace`
+          # makes the value irrelevant otherwise.
+          module_major=$(printf '%s' "${module_path}" | sed -n 's|.*/v\([0-9][0-9]*\)$|\1|p')
+          placeholder="v${module_major:-0}.0.0"
+          go mod edit -require="${module_path}@${placeholder}" -replace="${module_path}=${GITHUB_WORKSPACE}"
           printf 'package main\n\nimport _ "%s"\n\nfunc main() {}\n' "${first_package}" > main.go
           go mod tidy
           go build ./...
