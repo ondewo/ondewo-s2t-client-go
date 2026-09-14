@@ -8,7 +8,7 @@
 
 * Initial release of the ONDEWO S2T (Speech-to-Text) gRPC client for Go. The module
   ships the stubs generated from the [ONDEWO S2T API](https://github.com/ondewo/ondewo-s2t-api)
-  by version 5.15.0 of the
+  by version 5.15.1 of the
   [ONDEWO Proto Compiler](https://github.com/ondewo/ondewo-proto-compiler): one `*.pb.go` of
   messages and one `*_grpc.pb.go` of service stubs per `.proto`, below `api/ondewo/s2t/`,
   compiled against the `google.golang.org/protobuf` and `google.golang.org/grpc` runtimes pinned by
