@@ -49,7 +49,7 @@ ONDEWO_S2T_VERSION=7.5.0
 
 # Submodule pins - `make checkout_defined_submodule_versions` checks these out
 ONDEWO_S2T_API_GIT_BRANCH=tags/7.5.0
-ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.15.1
+ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.15.2
 
 # You need to setup an access token at https://github.com/settings/tokens - permissions are important
 GITHUB_GH_TOKEN?=ENTER_YOUR_TOKEN_HERE
