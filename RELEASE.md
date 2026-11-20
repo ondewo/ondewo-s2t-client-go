@@ -2,6 +2,16 @@
 
 *****************
 
+## Release ONDEWO S2T Go Client 7.6.0
+
+### Improvements
+
+* Tracking API Version [7.6.0](https://github.com/ondewo/ondewo-s2t-api/releases/tag/7.6.0) ( [Documentation](https://ondewo.github.io/ondewo-s2t-api/) )
+* Generated with ondewo-proto-compiler 5.17.0 (protoc 35.1, `protoc-gen-go` v1.36.12). New runtime floors: `google.golang.org/grpc` v1.85.0, `google.golang.org/protobuf` v1.36.12, genproto v0.0.0-20261116203732-fd2c7689a808 and `go 1.26.0`.
+* The build and the release run in docker, as in ondewo-nlu-client-go: the host needs only `make`, `git`, `docker` and `perl`. The go toolchain and the `gh` CLI live in the utils image built from `Dockerfile.utils`, the compiler container runs as the invoking user (no `sudo`), the GitHub token is validated before anything is pushed and the GitHub release is created last. The tag-triggered `release.yml` workflow is removed: CI only tests.
+
+*****************
+
 ## Release ONDEWO S2T Go Client 7.5.1
 
 ### New Features

@@ -43,7 +43,7 @@ The client is a plain Go module, published to the public module proxy
 is no registry account, no token and no `go install` step in between. Add it to your module with:
 
 ```shell
-go get github.com/ondewo/ondewo-s2t-client-go/v7@latest   ## or @v7.5.1 to pin an exact release
+go get github.com/ondewo/ondewo-s2t-client-go/v7@latest   ## or @v7.6.0 to pin an exact release
 ```
 
 Then import the package of the service you need:
@@ -60,9 +60,9 @@ import s2tpb "github.com/ondewo/ondewo-s2t-client-go/v7/api/ondewo/s2t"
 > major version must be compatible`. The suffix moves with the major version of the ONDEWO S2T API,
 > so an `8.x` release will be imported as `/v8`, and a program can depend on both at once.
 
-Releases are tagged twice on the same commit: with the ONDEWO release number (`7.5.1`), which is
+Releases are tagged twice on the same commit: with the ONDEWO release number (`7.6.0`), which is
 what the [GitHub releases page](https://github.com/ondewo/ondewo-s2t-client-go/releases) lists and
-what the rest of the ONDEWO client fleet uses, and with the `v`-prefixed spelling (`v7.5.1`), which
+what the rest of the ONDEWO client fleet uses, and with the `v`-prefixed spelling (`v7.6.0`), which
 is the only tag shape Go tooling recognises as a module version. Use the `v`-prefixed one in
 `go get`, `go.mod` and anywhere else a version is written.
 
@@ -78,6 +78,14 @@ git clone https://github.com/ondewo/ondewo-s2t-client-go.git   ## Clone the repo
 cd ondewo-s2t-client-go                                        ## Change into the repo directory
 make setup_developer_environment_locally              ## Check out submodules, install pre-commit hooks
 ```
+
+Building and releasing need only `make`, `git`, `docker` and `perl` on the host. The stubs are
+generated in the proto compiler image, and every step that needs the Go toolchain or the `gh` CLI runs
+in the utils image built from [`Dockerfile.utils`](Dockerfile.utils) (`ondewo-s2t-client-utils-go:<version>`),
+which mounts the repository and runs as the invoking user, so nothing it writes is root-owned. The Go
+targets themselves (`go_build`, `test`, `vet`, `publish_dry_run`, …) call `go` directly: that is how
+they run inside the image, how CI runs its checks, and with a local Go toolchain they work without
+docker as well.
 
 ## Usage
 
@@ -293,9 +301,9 @@ A failed handshake is `codes.Unavailable`; the cause is in the error text:
 ├── ondewo-proto-compiler                  <----- submodule @ https://github.com/ondewo/ondewo-proto-compiler
 ├── .github
 │   └── workflows
-│       ├── ci.yml                          <----- build, test, lint and the credential-free publish rehearsal
-│       └── release.yml                     <----- tagged-tree verification + module proxy warm-up, on a v* tag push
+│       └── ci.yml                          <----- tests and lint on every push / PR - no secrets, publishes nothing
 ├── CONTRIBUTING.md
+├── Dockerfile.utils                       <----- the go toolchain + gh CLI image every go/gh step of `make build` and `make release` runs in
 ├── go.mod                                 <----- module manifest, written by the compiler on the first run
 ├── go.sum
 ├── LICENSE
@@ -313,13 +321,14 @@ repositories.
 ```shell
 make update_submodules                      ## git submodule update --init --recursive
 make checkout_defined_submodule_versions    ## check out the pins from the Makefile Variables chapter
+make update_go_version                      ## derive go.mod's module path, the self-imports and README's versions from the Makefile
 make build_compiler                         ## build ondewo-go-proto-compiler:latest from the submodule
 make generate_ondewo_protos                 ## generate api/ from ondewo-s2t-api/ondewo
-make check_build                            ## assert every .proto produced a *.pb.go
-make go_build                               ## compile the module
+make go_build_via_docker                    ## build the utils image and compile the module in it
 ```
 
-`make build` runs the whole chain in that order.
+`make build` runs the whole chain in that order; `make check_build` then asserts that every `.proto`
+produced a `*.pb.go`.
 
 A few properties of the generation worth knowing:
 
@@ -334,11 +343,14 @@ A few properties of the generation worth knowing:
   generated stubs at the end of every run so a drift is visible.
 * Generation needs no network: every module the stubs are compiled against was pre-downloaded when
   the image was built.
+* The compiler container runs as the invoking user (`--user`), so the generated files are never
+  root-owned and no `sudo` is needed afterwards.
 
 ## Testing
 
 ```shell
 make check_stubs            ## assert the generated stubs are committed
+make test_via_docker        ## gofmt, go vet and test_coverage below, in the utils image (no local go needed)
 make test                   ## go test over every package
 make test_coverage          ## the same suite under -race, plus the hand-written coverage gate
 make test_coverage_generated ## report (never gate) how much of api/ the suite exercises
@@ -392,23 +404,51 @@ are still exercised for real, as listed above; `make test_coverage_generated` pr
 fails if it ends up measuring no hand-written function at all, so a deleted package cannot turn the
 gate into a green no-op.
 
-`.github/workflows/ci.yml` runs exactly these targets on `ubuntu-latest` against the go directive of
-`go.mod` and the toolchain the compiler image generates with. It does **not** build the compiler
-image or check out the submodules: it builds and tests the committed stubs, which is what a
-consumer of the module gets.
+`.github/workflows/ci.yml` runs these targets except `test`, which `test_coverage` supersedes, and
+`test_via_docker`, because it installs go with `actions/setup-go` instead. It runs them on
+`ubuntu-latest` against the go directive of `go.mod` and the toolchain the compiler image generates
+with. It does **not** build the compiler image or check out the submodules: it builds and tests the
+committed stubs, which is what a consumer of the module gets. CI is a test and lint gate only — it
+uses no secret, and it never tags, packages or publishes anything.
 
 ## Release
 
-The release is driven entirely by the `Makefile` — see `make help` for the full list of targets.
+A release runs entirely on the release host, driven by the `Makefile` — CI tags, packages and
+publishes nothing, and nothing has to be approved or clicked by hand. See `make help` for the full
+list of targets.
 
 ```shell
 make ondewo_release                         ## credentials from the devops-accounts repo, then `make release`
 ```
 
-`make release` builds, commits, creates the release branch, pushes **two** tags for the same commit
-— the ONDEWO release tag (`7.5.1`) and the `v`-prefixed tag Go tooling requires (`v7.5.1`) — creates
-the GitHub release from the matching `RELEASE.md` entry, and asks the public module proxy to fetch
-the new version.
+The host needs `make`, `git` (with SSH access to GitHub and to Bitbucket, where
+`ondewo-devops-accounts` lives), `docker` and `perl`; every step that needs `go` or `gh`
+runs in the utils image. `make release` runs, in this order:
+
+1. **Credentials** — `check_gh_credentials` fails when `GITHUB_GH_TOKEN` is empty or still the
+   placeholder, and `validate_release_credentials_via_docker_image` then asks GitHub with one
+   read-only call (`gh api repos/ondewo/ondewo-s2t-client-go`) whether the token is valid and may
+   push to this repository. A revoked token stops the release here (HTTP 401 `Bad credentials`),
+   before anything is pushed.
+2. **Checks, build and tests** — `check_release_notes`, `build` (stubs in the compiler image,
+   `go build` in the utils image), `check_build`, `check_go_module_path` and `test_via_docker`.
+3. **Commit** — the generated stubs and the version-bearing files are committed as
+   `PREPARING FOR RELEASE <version>`. A failing commit stops the release instead of letting the
+   tags name the previous commit.
+4. **Publication rehearsal** — `publish_dry_run_via_docker` on that commit (see below), the last
+   step before anything is pushed.
+5. **Push** — `master`, the release branch and **two** tags for the same commit: the ONDEWO release
+   tag (`7.6.0`) and the `v`-prefixed tag Go tooling requires (`v7.6.0`). The `v` tag *is* the
+   published module.
+6. **Module proxy** — `publish_go_module_via_docker` asks `proxy.golang.org` for the new version,
+   with a short retry. A failure only prints a warning: the module is released once its tag is
+   pushed, and the proxy fetches the tag on the first `go get` anyway.
+7. **GitHub release, last** — created from the matching `RELEASE.md` entry, so a GitHub release
+   exists only for a version whose every earlier step succeeded.
+
+`make ondewo_release` runs `make update_go_version` first (and `make build` runs it again), so a
+release for which only `ONDEWO_S2T_VERSION` in the `Makefile` was changed, as ondewo-s2t-api's
+`release_all_clients` does, still commits a `go.mod`, self-imports and README that agree with the tag.
 
 ### How publishing works, and what it costs
 
@@ -417,7 +457,7 @@ of exactly what git has under that tag, so **the tag *is* the published artifact
 registry account to own, no namespace to claim and no publishing credential to rotate. The whole
 correctness question is therefore about the tag:
 
-* it must be spelled `v<semver>` — `7.5.1` alone is not a Go module version;
+* it must be spelled `v<semver>` — `7.6.0` alone is not a Go module version;
 * the module path in `go.mod` must end in `/vN` matching the tag's major version, and that path is
   baked by `protoc-gen-go` into every generated import, so it cannot be patched after generation —
   `make generate_ondewo_protos` passes it to the compiler image as the third positional argument;
@@ -428,40 +468,33 @@ Each of those is a gate rather than a convention:
 ```shell
 make check_go_module_path   ## go.mod and every self-import carry the /vN that ONDEWO_S2T_VERSION implies
 make check_release_notes    ## RELEASE.md has an entry for this version (`gh release create -n ""` would not complain)
-make publish_dry_run        ## rehearse the whole publication, offline and without credentials
+make publish_dry_run        ## rehearse the whole publication, without credentials
 ```
 
 `make publish_dry_run` is the interesting one. It packs `git archive HEAD` into the module zip the
 proxy would serve, publishes it through a throwaway `file://` module proxy, and then resolves and
 compiles it from a consumer module outside this tree under the real release version — so a module
 path that disagrees with the tag, a self-import missing its suffix, or generated code that never
-reached the commit all fail here instead of at a stranger's `go get`. It needs no network beyond the
-module cache and no secret of any kind, which is why `.github/workflows/ci.yml` runs it on every
-push, and `make release` runs it once more immediately before the tags are created.
+reached the commit all fail here instead of at a stranger's `go get`. It needs no secret of any
+kind, and the network only for the module's dependencies, as any `go get` does. `make release` runs
+it on the release commit, before anything is pushed; run it yourself (or
+`make publish_dry_run_via_docker`) after committing a change to the stubs or to `go.mod`.
 
 ### Credentials
 
-The only credential in this repository buys the **GitHub release**, not the module:
+The release uses exactly one credential, and it buys the **GitHub release**, not the module:
 
 | Variable | Where it comes from | What it is for |
 | --- | --- | --- |
-| `GITHUB_GH_TOKEN` | `ondewo-devops-accounts/account_github.env` | `gh release create` — the GitHub release page and its notes |
+| `GITHUB_GH_TOKEN` | `ondewo-devops-accounts/account_github.env` | the validity check before the first push, and `gh release create` — the GitHub release page and its notes |
 
-`make ondewo_release` clones `ondewo-devops-accounts`, reads `account_github.env` and passes the
-token into `make release` (`clone_devops_accounts` + `run_release_with_devops`); the working default
-in the `Makefile` is the placeholder `ENTER_YOUR_TOKEN_HERE`, and a real token is never committed.
-
-`.github/workflows/release.yml` re-verifies the tagged tree from CI on a `v*` tag push, reading the
-token from the repository secret **`ONDEWO_GH_TOKEN`** — the same value as `GITHUB_GH_TOKEN` above.
-The secret cannot carry that name: GitHub reserves every secret name beginning with `GITHUB_`, and
-`ONDEWO_GH_TOKEN` is the one spelling the whole client fleet uses. Its first step fails the run with
-an explicit message when that secret is missing, before anything is built — a release that cannot be
-verified has to stop there, because the tag it describes is already immutable.
-
-The workflow does **not** create the GitHub release. `make release` does, and `gh release create` is
-not idempotent — a second create for the same tag is HTTP 422 `already_exists` — so when both sides
-created it, the local run won the race and the workflow went red on every single release. It now
-waits for that release to appear and then reads its body back, failing if the notes are empty.
+It lives only in `ondewo-devops-accounts`. `make ondewo_release` clones that repository, reads only
+the `GITHUB_GH_TOKEN=` line of `account_github.env` and passes it into `make release`
+(`clone_devops_accounts` + `run_release_with_devops`), which hands it to the utils container through
+the environment (`docker run -e GITHUB_GH_TOKEN`), never on the `docker` command line. The clone is
+gitignored and removed after a successful release. The working default in the `Makefile` is the
+placeholder `ENTER_YOUR_TOKEN_HERE`, and a real token is never committed. No GitHub repository or
+organisation secret is used anywhere: CI only tests, and needs none.
 
 ## Contributing
 

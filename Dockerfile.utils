@@ -1,0 +1,25 @@
+# The utils image of ondewo-s2t-client-go: the go toolchain and the gh CLI, so that building, testing,
+# rehearsing the publication and releasing need nothing on the host but make, git, docker and perl.
+# Nothing is COPYed in: the Makefile mounts the repository at run time (UTILS_DOCKER_RUN) and
+# runs the container as the invoking user, so whatever a target writes lands in the working tree and
+# is never root-owned.
+#
+# Pinned to the go release the proto compiler image generates with (ci.yml's upper bound, 1.27).
+# The `go` directive of go.mod (1.25.0) is only the floor, which ci.yml covers on every push.
+# The Debian based variant, not alpine: it already carries make, git, perl, curl and gcc (cgo, which
+# `go test -race` in `make test_coverage` needs).
+FROM golang:1.27.1-trixie
+
+ENV LANG=C.UTF-8
+ENV DEBIAN_FRONTEND=noninteractive
+
+# gh from GitHub's apt repository, as in the utils images of the other ONDEWO clients
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends gh \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home/ondewo

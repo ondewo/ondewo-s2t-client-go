@@ -48,9 +48,14 @@ This repository is roughly 95% generated code.
 
 ```shell
 make setup_developer_environment_locally    ## submodules + pre-commit hooks
-make build                                  ## compiler image, stub generation, go build
-make test                                   ## go test
+make build                                  ## compiler image, stub generation, go build - all in docker
+make test_via_docker                        ## gofmt, go vet, go test with the coverage gate - in docker
+make test                                   ## go test with a local go toolchain
 ```
+
+`make build` and `make test_via_docker` need only `make`, `git`, `docker` and `perl` on the host:
+the Go toolchain and the `gh` CLI live in the utils image built from `Dockerfile.utils`.
+`make fmt`, `make vet` and `make test` call `go` directly and need a local toolchain.
 
 ## Commit messages
 

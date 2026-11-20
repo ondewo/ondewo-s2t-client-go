@@ -1,8 +1,9 @@
 #############################################################################################
 # pre-commit - language-agnostic hooks only. Go's own toolchain owns go formatting, vetting   #
-# and testing (`make fmt` / `make vet` / `make test`, wired into .github/workflows/ci.yml);   #
-# nothing here shells out to it, so a contributor without a go toolchain can still commit     #
-# documentation. Ruff/mypy/uv are python-only and NOT included.                               #
+# and testing (.github/workflows/ci.yml gates on `make fmt_check` / `make vet` /              #
+# `make test_coverage`; `make fmt` fixes the formatting locally); nothing here shells out to  #
+# it, so a contributor without a go toolchain can still commit documentation. Ruff/mypy/uv    #
+# are python-only and NOT included.                                                           #
 # see https://pre-commit.com/#intro for an introduction to pre-commit                         #
 #############################################################################################
 
