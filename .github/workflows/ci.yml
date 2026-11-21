@@ -24,7 +24,7 @@ jobs:
       matrix:
         # The lower bound is the `go` directive of the committed go.mod; the upper bound is the
         # toolchain the proto compiler image generates with.
-        go-version: ['1.25', '1.27']
+        go-version: ['1.26', '1.27']
     steps:
       # `submodules:` is deliberately NOT enabled: the generated api/ directory is committed to
       # this repository, so the module compiles from the checkout alone, and both submodules are

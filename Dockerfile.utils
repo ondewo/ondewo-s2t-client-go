@@ -5,7 +5,7 @@
 # is never root-owned.
 #
 # Pinned to the go release the proto compiler image generates with (ci.yml's upper bound, 1.27).
-# The `go` directive of go.mod (1.25.0) is only the floor, which ci.yml covers on every push.
+# The `go` directive of go.mod (1.26.0) is only the floor, which ci.yml covers on every push.
 # The Debian based variant, not alpine: it already carries make, git, perl, curl and gcc (cgo, which
 # `go test -race` in `make test_coverage` needs).
 FROM golang:1.27.1-trixie
